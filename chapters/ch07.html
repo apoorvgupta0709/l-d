@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch 7 · Finetuning</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body data-chapter="ch07">
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="../index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Chapter 7 of 10</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="chapter-head">
+    <p class="kicker">Chapter 7</p>
+    <h1>Finetuning</h1>
+    <p class="lede">Training the model itself on your examples — the most powerful adaptation technique, and
+    the one to reach for last. The key questions: when is it actually worth it, and how does modern
+    parameter-efficient finetuning make it affordable?</p>
+  </section>
+
+  <h2>Should you finetune? Follow the flow</h2>
+  <p>Finetuning competes with cheaper options. Diagnose the problem type first — it picks the technique for you.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="Decision flow for choosing between prompting, RAG, and finetuning">
+      <defs>
+        <marker id="a71" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="start" tabindex="0" role="button" aria-label="Model underperforms">
+        <rect x="30" y="125" width="200" height="62" rx="10"/>
+        <text x="130" y="151" text-anchor="middle">Model falls short</text>
+        <text class="sub" x="130" y="171" text-anchor="middle">…and prompting is maxed out</text>
+      </g>
+      <line class="edge" x1="230" y1="156" x2="295" y2="156" marker-end="url(#a71)"/>
+      <g class="node c-violet" data-node="diagnose" tabindex="0" role="button" aria-label="Diagnose the failure">
+        <rect x="300" y="125" width="200" height="62" rx="10"/>
+        <text x="400" y="151" text-anchor="middle">Diagnose</text>
+        <text class="sub" x="400" y="171" text-anchor="middle">what kind of failure is it?</text>
+      </g>
+      <line class="edge" x1="500" y1="140" x2="600" y2="72" marker-end="url(#a71)"/>
+      <line class="edge" x1="500" y1="156" x2="600" y2="156" marker-end="url(#a71)"/>
+      <line class="edge" x1="500" y1="172" x2="600" y2="240" marker-end="url(#a71)"/>
+      <text class="lbl" x="548" y="90" text-anchor="middle">wrong facts</text>
+      <text class="lbl" x="550" y="148" text-anchor="middle">wrong behavior</text>
+      <text class="lbl" x="548" y="222" text-anchor="middle">too big / slow</text>
+      <g class="node c-aqua" data-node="userag" tabindex="0" role="button" aria-label="Use RAG">
+        <rect x="605" y="30" width="265" height="62" rx="10"/>
+        <text x="737" y="56" text-anchor="middle">Information problem → RAG</text>
+        <text class="sub" x="737" y="76" text-anchor="middle">missing, private, or stale knowledge</text>
+      </g>
+      <g class="node c-yellow" data-node="useft" tabindex="0" role="button" aria-label="Use finetuning">
+        <rect x="605" y="125" width="265" height="62" rx="10"/>
+        <text x="737" y="151" text-anchor="middle">Behavior problem → Finetune</text>
+        <text class="sub" x="737" y="171" text-anchor="middle">format, style, domain fluency</text>
+      </g>
+      <g class="node c-orange" data-node="distill" tabindex="0" role="button" aria-label="Distill to a smaller model">
+        <rect x="605" y="220" width="265" height="62" rx="10"/>
+        <text x="737" y="246" text-anchor="middle">Cost problem → Distill</text>
+        <text class="sub" x="737" y="266" text-anchor="middle">finetune a small model to replace a big one</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a path</span> to see the reasoning.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "start": {"title": "Model falls short — after real prompt effort", "body": "Finetuning discussions start only after systematic prompt engineering (with evals proving it's maxed out). Teams that skip to finetuning often spend weeks reproducing what a better prompt achieves in an afternoon."},
+      "diagnose": {"title": "Diagnose the failure", "body": "The crucial question: does the model not KNOW something, or does it not BEHAVE how you want? Knowledge gaps and behavior gaps have different cures — applying the wrong one wastes months."},
+      "userag": {"title": "Information problem → RAG", "body": "Wrong or outdated facts, no access to your private data: that's a knowledge gap. RAG fixes it directly, updates instantly when documents change, and gives citations. Finetuning is a poor way to inject facts — it can't keep them fresh."},
+      "useft": {"title": "Behavior problem → Finetune", "body": "The model knows enough but outputs the wrong form: inconsistent formatting, wrong tone, ignoring domain conventions, unreliable structured output. Training on hundreds-to-thousands of good examples reshapes behavior more deeply than any prompt."},
+      "distill": {"title": "Cost problem → Distill", "body": "A big model does the task well but is too slow or expensive at scale. Use it as a teacher: generate high-quality training examples, finetune a small model on them, and serve the student for a fraction of the cost. One of the strongest business cases for finetuning."}
+    }
+    </script>
+  </figure>
+
+  <h2>LoRA — finetuning without the bill</h2>
+  <p>Full finetuning updates billions of weights. LoRA freezes them all and trains two tiny matrices instead.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 300" role="img" aria-label="LoRA: a frozen weight matrix plus small trainable adapter matrices">
+      <defs>
+        <marker id="a72" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-gray" data-node="frozen" tabindex="0" role="button" aria-label="Frozen pretrained weights">
+        <rect x="60" y="40" width="300" height="200" rx="10"/>
+        <text x="210" y="130" text-anchor="middle">Pretrained weights W</text>
+        <text class="sub" x="210" y="152" text-anchor="middle">billions of parameters — ❄ frozen</text>
+      </g>
+      <text x="405" y="148" text-anchor="middle" style="font-size:26px">+</text>
+      <g class="node c-aqua" data-node="lora-a" tabindex="0" role="button" aria-label="Adapter matrix A">
+        <rect x="450" y="40" width="70" height="200" rx="10"/>
+        <text x="485" y="135" text-anchor="middle">A</text>
+      </g>
+      <text x="552" y="148" text-anchor="middle" style="font-size:22px">×</text>
+      <g class="node c-aqua" data-node="lora-b" tabindex="0" role="button" aria-label="Adapter matrix B">
+        <rect x="585" y="105" width="200" height="70" rx="10"/>
+        <text x="685" y="147" text-anchor="middle">B</text>
+      </g>
+      <text class="lbl" x="617" y="60" text-anchor="middle">🔥 trainable — under 1%</text>
+      <text class="lbl" x="617" y="80" text-anchor="middle">of the parameters</text>
+      <line class="edge" x1="685" y1="175" x2="685" y2="235" marker-end="url(#a72)"/>
+      <g class="node c-green" data-node="merged" tabindex="0" role="button" aria-label="Adapted model">
+        <rect x="560" y="240" width="250" height="46" rx="10"/>
+        <text x="685" y="269" text-anchor="middle">W + A·B = adapted model</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click the matrices</span> to see the trick.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "frozen": {"title": "Frozen pretrained weights", "body": "The original model is left untouched. That's most of the memory savings: no gradients or optimizer state for billions of parameters — and no risk of catastrophically forgetting general abilities."},
+      "lora-a": {"title": "Adapter matrix A", "body": "The insight: the CHANGE a finetune makes to a weight matrix is approximately low-rank — expressible as the product of two thin matrices. A projects down to a tiny rank r (say 8–64)…"},
+      "lora-b": {"title": "Adapter matrix B", "body": "…and B projects back up. Together A·B represent the weight update with under 1% of the parameters, making finetuning feasible on a single GPU instead of a cluster."},
+      "merged": {"title": "The adapted model", "body": "At inference, A·B can be merged into W — zero extra latency. Or keep adapters separate and hot-swap them: one base model serving many customer-specific finetunes, one adapter each. That multi-tenant trick is a production superpower."}
+    }
+    </script>
+  </figure>
+
+  <h2>RAG vs finetuning — the cheat sheet</h2>
+  <p>The most common "which one?" question in AI engineering, settled by what kind of gap you're closing.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 290" role="img" aria-label="Side-by-side comparison of RAG and finetuning, which combine well">
+      <g class="node c-aqua" data-node="rag" tabindex="0" role="button" aria-label="RAG">
+        <rect x="60" y="30" width="360" height="160" rx="10"/>
+        <text x="240" y="62" text-anchor="middle">RAG</text>
+        <text class="sub" x="240" y="90" text-anchor="middle">adds knowledge</text>
+        <text class="sub" x="240" y="112" text-anchor="middle">facts, freshness, private data</text>
+        <text class="sub" x="240" y="134" text-anchor="middle">updates instantly · gives citations</text>
+        <text class="sub" x="240" y="156" text-anchor="middle">no training needed</text>
+      </g>
+      <g class="node c-yellow" data-node="ft" tabindex="0" role="button" aria-label="Finetuning">
+        <rect x="480" y="30" width="360" height="160" rx="10"/>
+        <text x="660" y="62" text-anchor="middle">Finetuning</text>
+        <text class="sub" x="660" y="90" text-anchor="middle">changes behavior</text>
+        <text class="sub" x="660" y="112" text-anchor="middle">format, style, reliability</text>
+        <text class="sub" x="660" y="134" text-anchor="middle">shrinks prompts · enables small models</text>
+        <text class="sub" x="660" y="156" text-anchor="middle">needs data + training + upkeep</text>
+      </g>
+      <g class="node c-green" data-node="both" tabindex="0" role="button" aria-label="Use both together">
+        <rect x="270" y="215" width="360" height="56" rx="10"/>
+        <text x="450" y="239" text-anchor="middle">…and they stack</text>
+        <text class="sub" x="450" y="259" text-anchor="middle">finetuned behavior + retrieved knowledge</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click each side</span> — and the combination.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "rag": {"title": "RAG: for what the model should KNOW", "body": "Memory aid: RAG is like handing the model reference documents at answer time. Perfect for facts that change, data that's private, and answers that need citations. It does nothing about how the model behaves."},
+      "ft": {"title": "Finetuning: for how the model should ACT", "body": "Like sending the model to training camp: it internalizes your format, tone, and domain conventions. Bonus effects: system prompts shrink (the behavior is baked in), and small models become viable for the task. Cost: building datasets and re-training when requirements change."},
+      "both": {"title": "They stack", "body": "A common production endgame: a small model finetuned for your task's behavior, fed fresh knowledge by RAG. Each covers what the other can't — behavior can't be retrieved, and knowledge shouldn't be baked into weights."}
+    }
+    </script>
+  </figure>
+
+  <h2>Key takeaways</h2>
+  <ul class="takeaways">
+    <li><strong>Finetune last</strong> Exhaust prompting (cheap) and consider RAG (for knowledge) first — with evals proving the gap each time.</li>
+    <li><strong>Facts vs form</strong> RAG fixes what the model knows; finetuning fixes how it behaves. Misdiagnosing this wastes months.</li>
+    <li><strong>LoRA changed the economics</strong> Training under 1% of parameters puts finetuning on a single GPU — and swappable adapters enable per-customer models.</li>
+    <li><strong>Distillation is the killer app</strong> Finetuning a small model on a big model's outputs is how you cut serving costs 10× without losing your task's quality.</li>
+  </ul>
+
+  <h2>Check yourself</h2>
+  <section class="quiz">
+    <div class="quiz-body"></div>
+    <script type="application/json" class="quiz-data">
+    [
+      {"q": "Your support bot cites last year's pricing. Finetuning on current prices would be a mistake because…",
+       "opts": ["Finetuning is always worse than prompting", "Prices will change again — baked-in facts go stale; RAG keeps knowledge current", "Models can't learn numbers", "It would be too fast"],
+       "a": 1,
+       "why": "This is an information problem with a shelf life. RAG reads from a source you can update anytime; a finetuned model would need retraining at every price change."},
+      {"q": "What does LoRA actually train?",
+       "opts": ["All model weights, but slowly", "The tokenizer", "Two small low-rank matrices whose product approximates the weight update", "Only the final output layer"],
+       "a": 2,
+       "why": "The base weights stay frozen; LoRA learns thin matrices A and B (under 1% of parameters) representing the change. Merge them in for zero-latency inference, or hot-swap them per task."},
+      {"q": "GPT-class quality is too expensive at your traffic volume. Which finetuning play addresses this directly?",
+       "opts": ["Finetune the big model to be cheaper", "Distill: use the big model's outputs to finetune a small model, then serve the small one", "Use chain-of-thought", "Increase batch size on the big model"],
+       "a": 1,
+       "why": "Distillation transfers task-specific quality from an expensive teacher into a cheap student. For a narrow task, the small finetuned model often matches the teacher at a fraction of the cost."},
+      {"q": "Which failure signals a genuine finetuning use case (not RAG, not prompting)?",
+       "opts": ["The model doesn't know your org chart", "Answers cite outdated news", "Despite good prompts and examples, output format is right only 80% of the time and you need 99%+", "The model is too slow"],
+       "a": 2,
+       "why": "Knowledge gaps → RAG; speed/cost → optimization or distillation. Persistent behavioral unreliability that prompting can't close is the classic finetuning trigger — training on correct examples pushes reliability past what prompts achieve."}
+    ]
+    </script>
+  </section>
+
+  <div class="chapter-actions">
+    <button id="complete-btn" class="complete-btn" type="button">Mark chapter as complete</button>
+  </div>
+
+  <nav class="pager">
+    <a href="ch06.html"><span class="dir">← Previous</span>RAG &amp; Agents</a>
+    <a href="ch08.html"><span class="dir">Next chapter →</span>Dataset Engineering</a>
+  </nav>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+<script src="../js/diagram.js"></script>
+<script src="../js/quiz.js"></script>
+</body>
+</html>

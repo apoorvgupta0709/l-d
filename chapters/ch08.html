@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch 8 · Dataset Engineering</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body data-chapter="ch08">
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="../index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Chapter 8 of 10</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="chapter-head">
+    <p class="kicker">Chapter 8</p>
+    <h1>Dataset Engineering</h1>
+    <p class="lede">Whether you're finetuning, evaluating, or distilling, the ceiling on your results is your
+    data. Dataset engineering is the unglamorous craft that decides model quality — three properties to
+    balance, a pipeline to build, and a synthesis shortcut with sharp edges.</p>
+  </section>
+
+  <h2>The three pillars of a good dataset</h2>
+  <p>Model performance rests on all three. Teams obsess over quantity; the other two matter more.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 300" role="img" aria-label="Model performance resting on three pillars: quality, coverage, and quantity">
+      <g class="node c-green" data-node="perf" tabindex="0" role="button" aria-label="Model performance">
+        <rect x="150" y="30" width="600" height="60" rx="10"/>
+        <text x="450" y="55" text-anchor="middle">Model performance</text>
+        <text class="sub" x="450" y="75" text-anchor="middle">only as strong as what it stands on</text>
+      </g>
+      <g class="node c-blue" data-node="quality" tabindex="0" role="button" aria-label="Quality">
+        <rect x="150" y="110" width="180" height="150" rx="10"/>
+        <text x="240" y="180" text-anchor="middle">Quality</text>
+        <text class="sub" x="240" y="202" text-anchor="middle">correct · consistent</text>
+      </g>
+      <g class="node c-violet" data-node="coverage" tabindex="0" role="button" aria-label="Coverage">
+        <rect x="360" y="110" width="180" height="150" rx="10"/>
+        <text x="450" y="180" text-anchor="middle">Coverage</text>
+        <text class="sub" x="450" y="202" text-anchor="middle">diverse · representative</text>
+      </g>
+      <g class="node c-yellow" data-node="quantity" tabindex="0" role="button" aria-label="Quantity">
+        <rect x="570" y="110" width="180" height="150" rx="10"/>
+        <text x="660" y="180" text-anchor="middle">Quantity</text>
+        <text class="sub" x="660" y="202" text-anchor="middle">enough — not endless</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a pillar</span> to see what it demands.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "perf": {"title": "Model performance", "body": "Garbage in, garbage out — with training data, literally. A model finetuned on flawed examples learns the flaws with perfect fidelity. Data work is model work."},
+      "quality": {"title": "Quality", "body": "Every example teaches the model something — wrong answers, sloppy formatting, and inconsistent labels teach exactly those. A small pile of verified, consistent examples beats a mountain of scraped ones: a few thousand excellent examples can outperform hundreds of thousands of mediocre ones for instruction finetuning."},
+      "coverage": {"title": "Coverage", "body": "The dataset must span the situations the model will face: input styles, topics, edge cases, and the tricky cases where it currently fails. A model only generalizes across what its data covers — gaps in data become gaps in behavior."},
+      "quantity": {"title": "Quantity", "body": "More helps — with diminishing returns, and never as a substitute for the other two pillars. Behavioral finetuning can work with hundreds to thousands of examples; the deeper the change you want, the more you need. Start small, measure, scale what works."}
+    }
+    </script>
+  </figure>
+
+  <h2>The data curation pipeline</h2>
+  <p>Raw data becomes training data through a pipeline — every stage exists because skipping it once burned somebody.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 150" role="img" aria-label="Five-stage data curation pipeline from acquisition to final mix">
+      <defs>
+        <marker id="a82" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="acquire" tabindex="0" role="button" aria-label="Acquire">
+        <rect x="30" y="40" width="150" height="62" rx="10"/>
+        <text x="105" y="66" text-anchor="middle">Acquire</text>
+        <text class="sub" x="105" y="86" text-anchor="middle">gather sources</text>
+      </g>
+      <line class="edge" x1="180" y1="71" x2="212" y2="71" marker-end="url(#a82)"/>
+      <g class="node c-aqua" data-node="clean" tabindex="0" role="button" aria-label="Clean">
+        <rect x="216" y="40" width="150" height="62" rx="10"/>
+        <text x="291" y="66" text-anchor="middle">Clean</text>
+        <text class="sub" x="291" y="86" text-anchor="middle">fix &amp; normalize</text>
+      </g>
+      <line class="edge" x1="366" y1="71" x2="398" y2="71" marker-end="url(#a82)"/>
+      <g class="node c-violet" data-node="dedupe" tabindex="0" role="button" aria-label="Deduplicate">
+        <rect x="402" y="40" width="150" height="62" rx="10"/>
+        <text x="477" y="66" text-anchor="middle">Dedupe</text>
+        <text class="sub" x="477" y="86" text-anchor="middle">remove repeats</text>
+      </g>
+      <line class="edge" x1="552" y1="71" x2="584" y2="71" marker-end="url(#a82)"/>
+      <g class="node c-yellow" data-node="filter" tabindex="0" role="button" aria-label="Filter">
+        <rect x="588" y="40" width="150" height="62" rx="10"/>
+        <text x="663" y="66" text-anchor="middle">Filter</text>
+        <text class="sub" x="663" y="86" text-anchor="middle">keep the good</text>
+      </g>
+      <line class="edge" x1="738" y1="71" x2="770" y2="71" marker-end="url(#a82)"/>
+      <g class="node c-green" data-node="format" tabindex="0" role="button" aria-label="Format and mix">
+        <rect x="774" y="40" width="100" height="62" rx="10"/>
+        <text x="824" y="66" text-anchor="middle">Format</text>
+        <text class="sub" x="824" y="86" text-anchor="middle">&amp; mix</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click each stage</span> for what happens there.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "acquire": {"title": "Acquire", "body": "Sources ranked by value: your own production data (best — it IS the real distribution), public datasets, purchased data, and annotations you commission. Check licenses early: a dataset you can't legally use is worse than no dataset."},
+      "clean": {"title": "Clean", "body": "Strip markup and boilerplate, fix encodings, normalize formats, and remove PII (a legal requirement, not a nicety). Inspect samples by hand — every real dataset is dirtier than its owner believes."},
+      "dedupe": {"title": "Dedupe", "body": "Duplicates and near-duplicates skew training toward repeated content and — worse — leak between training and test splits, inflating your evals. Dedupe before splitting, and check test data against training data explicitly."},
+      "filter": {"title": "Filter", "body": "Score examples and keep the best: heuristics (length, structure), perplexity-based filters for gibberish, classifiers or AI judges for quality and toxicity. This is where the quality pillar is actually enforced."},
+      "format": {"title": "Format & mix", "body": "Convert to the training format (chat templates, instruction–response pairs), then choose the mix across sources and task types. The mix is a real lever: oversampling a weak area is often the cheapest way to fix it."}
+    }
+    </script>
+  </figure>
+
+  <h2>Synthetic data — the shortcut with sharp edges</h2>
+  <p>When real examples are scarce, models can manufacture them. Powerful — with two rules: verify, and check the license.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 240" role="img" aria-label="Synthetic data pipeline: seeds, generator model, verification, training set, plus risks">
+      <defs>
+        <marker id="a83" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="seed" tabindex="0" role="button" aria-label="Seed examples">
+        <rect x="30" y="40" width="170" height="62" rx="10"/>
+        <text x="115" y="66" text-anchor="middle">Seed examples</text>
+        <text class="sub" x="115" y="86" text-anchor="middle">a few real, good ones</text>
+      </g>
+      <line class="edge" x1="200" y1="71" x2="238" y2="71" marker-end="url(#a83)"/>
+      <g class="node c-violet" data-node="gen" tabindex="0" role="button" aria-label="Generator model">
+        <rect x="242" y="40" width="180" height="62" rx="10"/>
+        <text x="332" y="66" text-anchor="middle">Generator model</text>
+        <text class="sub" x="332" y="86" text-anchor="middle">produce variations</text>
+      </g>
+      <line class="edge" x1="422" y1="71" x2="460" y2="71" marker-end="url(#a83)"/>
+      <g class="node c-yellow" data-node="verify" tabindex="0" role="button" aria-label="Verify and filter">
+        <rect x="464" y="40" width="180" height="62" rx="10"/>
+        <text x="554" y="66" text-anchor="middle">Verify &amp; filter</text>
+        <text class="sub" x="554" y="86" text-anchor="middle">judges · rules · execution</text>
+      </g>
+      <line class="edge" x1="644" y1="71" x2="682" y2="71" marker-end="url(#a83)"/>
+      <g class="node c-green" data-node="trainset" tabindex="0" role="button" aria-label="Training set">
+        <rect x="686" y="40" width="184" height="62" rx="10"/>
+        <text x="778" y="66" text-anchor="middle">Training set</text>
+        <text class="sub" x="778" y="86" text-anchor="middle">scaled &amp; affordable</text>
+      </g>
+      <g class="node c-red" data-node="risks" tabindex="0" role="button" aria-label="Risks of synthetic data">
+        <rect x="242" y="150" width="402" height="62" rx="10"/>
+        <text x="443" y="176" text-anchor="middle">⚠ Risks</text>
+        <text class="sub" x="443" y="196" text-anchor="middle">inherited flaws · shrinking diversity · license terms</text>
+      </g>
+      <line class="edge dashed" x1="443" y1="150" x2="443" y2="110" marker-end="url(#a83)"/>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click the stages — and the risks.</span></figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "seed": {"title": "Seed examples", "body": "A handful of genuinely good, human-verified examples anchor the whole process. They define the pattern the generator will scale — flaws here get amplified a thousandfold."},
+      "gen": {"title": "Generator model", "body": "A strong model produces variations: paraphrases, new scenarios, harder cases, translations. When the generator is a better model than your target, this is distillation — you're transferring the teacher's ability through its data."},
+      "verify": {"title": "Verify & filter", "body": "The non-negotiable stage. Check synthetic examples with whatever is strictest: execute generated code against tests, apply rule-based checks, use AI judges for open-ended quality — then sample-check by hand. Unverified synthetic data is how you train a model on hallucinations."},
+      "trainset": {"title": "Training set", "body": "Verified synthetic data can multiply a small real dataset into a large training set at a fraction of annotation cost — often the only practical way to cover rare cases and low-resource domains."},
+      "risks": {"title": "The risks", "body": "Synthetic data inherits the generator's blind spots and biases; training repeatedly on model output narrows diversity (drifting toward 'model-speak'); and many providers' terms restrict using their outputs to train competing models. Verify quality, keep real data in the mix, and read the license."}
+    }
+    </script>
+  </figure>
+
+  <h2>Key takeaways</h2>
+  <ul class="takeaways">
+    <li><strong>Data is the ceiling</strong> No training trick rescues bad data. A few thousand excellent examples beat mountains of mediocre ones.</li>
+    <li><strong>Quality, coverage, quantity — in that order</strong> Correct and consistent first, representative second, big third.</li>
+    <li><strong>Dedupe before you split</strong> Duplicates leaking across train/test silently inflate every eval you run.</li>
+    <li><strong>Synthetic data must be verified</strong> Generation is easy; verification (execution, judges, human sampling) is what makes it usable.</li>
+  </ul>
+
+  <h2>Check yourself</h2>
+  <section class="quiz">
+    <div class="quiz-body"></div>
+    <script type="application/json" class="quiz-data">
+    [
+      {"q": "You can finetune on 500 hand-verified examples or 50,000 scraped, unchecked ones. Which is the safer bet, and why?",
+       "opts": ["50,000 — more data always wins", "500 — the model learns whatever the data teaches, including the scraped set's errors", "Neither works under 1M examples", "Both are equivalent"],
+       "a": 1,
+       "why": "For behavioral finetuning, quality dominates: the model faithfully learns errors and inconsistencies too. Small-but-excellent datasets routinely beat large-but-noisy ones."},
+      {"q": "Your eval scores look great, but production performance is poor. Which data-pipeline failure is a prime suspect?",
+       "opts": ["Too much filtering", "Near-duplicates leaked between training and test sets", "The chat template was wrong", "Not enough GPUs"],
+       "a": 1,
+       "why": "Train/test leakage via duplicates makes evals measure memorization, not generalization — classically producing great scores and disappointing reality. Dedupe before splitting."},
+      {"q": "What's the single most important stage of a synthetic data pipeline?",
+       "opts": ["Generating with the biggest model available", "Making prompts creative", "Verification — executing, judging, and sampling the generated data", "Generating as much as possible"],
+       "a": 2,
+       "why": "Unverified synthetic data can be plausible-looking hallucination at scale. Verification (strictest available: execution > rules > judges > sampling) is what separates a shortcut from a trap."},
+      {"q": "Your model fails on one rare-but-important input type. The cheapest data-side fix is usually to…",
+       "opts": ["Double the whole dataset", "Oversample or synthesize more examples of that case in the training mix", "Remove all other cases", "Lower the learning rate"],
+       "a": 1,
+       "why": "Coverage gaps are fixed with targeted data: boost that case's share of the mix, synthesizing examples if real ones are scarce. Blanket 'more data' barely moves a rare case's frequency."}
+    ]
+    </script>
+  </section>
+
+  <div class="chapter-actions">
+    <button id="complete-btn" class="complete-btn" type="button">Mark chapter as complete</button>
+  </div>
+
+  <nav class="pager">
+    <a href="ch07.html"><span class="dir">← Previous</span>Finetuning</a>
+    <a href="ch09.html"><span class="dir">Next chapter →</span>Inference Optimization</a>
+  </nav>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+<script src="../js/diagram.js"></script>
+<script src="../js/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch 9 · Inference Optimization</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body data-chapter="ch09">
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="../index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Chapter 9 of 10</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="chapter-head">
+    <p class="kicker">Chapter 9</p>
+    <h1>Inference Optimization</h1>
+    <p class="lede">A model that's too slow or too expensive doesn't ship. Optimization starts with measuring
+    the right latencies — then pulling levers at the model level, the service level, or both.</p>
+  </section>
+
+  <h2>The anatomy of a request</h2>
+  <p>"Latency" is two different numbers, produced by two different phases. Users feel each one differently.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 250" role="img" aria-label="Timeline of an LLM request: prefill produces the first token, decode streams the rest">
+      <defs>
+        <marker id="a91" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="request" tabindex="0" role="button" aria-label="Request arrives">
+        <rect x="30" y="50" width="130" height="62" rx="10"/>
+        <text x="95" y="76" text-anchor="middle">Request</text>
+        <text class="sub" x="95" y="96" text-anchor="middle">prompt sent</text>
+      </g>
+      <line class="edge" x1="160" y1="81" x2="196" y2="81" marker-end="url(#a91)"/>
+      <g class="node c-violet" data-node="prefill" tabindex="0" role="button" aria-label="Prefill phase">
+        <rect x="200" y="50" width="230" height="62" rx="10"/>
+        <text x="315" y="76" text-anchor="middle">Prefill</text>
+        <text class="sub" x="315" y="96" text-anchor="middle">process whole prompt in parallel</text>
+      </g>
+      <line class="edge" x1="430" y1="81" x2="466" y2="81" marker-end="url(#a91)"/>
+      <g class="node c-yellow" data-node="decode" tabindex="0" role="button" aria-label="Decode phase">
+        <rect x="470" y="50" width="270" height="62" rx="10"/>
+        <text x="605" y="76" text-anchor="middle">Decode</text>
+        <text class="sub" x="605" y="96" text-anchor="middle">generate one token at a time</text>
+      </g>
+      <line class="edge" x1="740" y1="81" x2="776" y2="81" marker-end="url(#a91)"/>
+      <g class="node c-green" data-node="donept" tabindex="0" role="button" aria-label="Response complete">
+        <rect x="780" y="50" width="90" height="62" rx="10"/>
+        <text x="825" y="87" text-anchor="middle">Done</text>
+      </g>
+      <g class="node c-aqua" data-node="ttft" tabindex="0" role="button" aria-label="Time to first token">
+        <rect x="200" y="150" width="230" height="52" rx="10"/>
+        <text x="315" y="172" text-anchor="middle">TTFT</text>
+        <text class="sub" x="315" y="191" text-anchor="middle">time to first token</text>
+      </g>
+      <g class="node c-orange" data-node="tpot" tabindex="0" role="button" aria-label="Time per output token">
+        <rect x="470" y="150" width="270" height="52" rx="10"/>
+        <text x="605" y="172" text-anchor="middle">TPOT</text>
+        <text class="sub" x="605" y="191" text-anchor="middle">time per output token</text>
+      </g>
+      <text class="lbl" x="450" y="235" text-anchor="middle">total latency ≈ TTFT + TPOT × number of output tokens</text>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a phase or a metric.</span></figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "request": {"title": "Request", "body": "The prompt arrives at the inference server — possibly queueing behind other requests first. Queueing time is invisible in model benchmarks but very visible to your users."},
+      "prefill": {"title": "Prefill", "body": "All prompt tokens are processed in parallel to build the attention cache. This phase is compute-bound: heavy matrix math that scales with prompt length. Long prompts (looking at you, RAG) make prefill — and thus first-token wait — slower."},
+      "decode": {"title": "Decode", "body": "Tokens are generated one at a time (Chapter 2's loop). This phase is memory-bandwidth-bound: each token requires streaming the model's weights through the chip. It's why long outputs dominate total latency."},
+      "donept": {"title": "Done", "body": "Generation ends at a stop token or the token limit. Want a faster feel for free? Ask the model to be concise — output length is the biggest latency lever most teams never pull."},
+      "ttft": {"title": "TTFT — time to first token", "body": "How long before the user sees anything. Driven by queueing plus prefill, so it grows with prompt length. For chat UIs, streaming plus a low TTFT creates the feeling of speed regardless of total time."},
+      "tpot": {"title": "TPOT — time per output token", "body": "The pace of the token stream once it starts. Users read at a few tokens per second, so a modest TPOT feels fine in chat — but agent chains and batch jobs care about total time, where TPOT × output length rules."}
+    }
+    </script>
+  </figure>
+
+  <h2>The optimization map</h2>
+  <p>Two places to attack: change the model, or serve it smarter. The big wins in each are here.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="Optimization techniques grouped into model-level and service-level zones">
+      <rect class="zone" x="25" y="30" width="410" height="270" rx="12"/>
+      <text class="title" x="45" y="58">Model level — change the model</text>
+      <g class="node c-blue" data-node="quant" tabindex="0" role="button" aria-label="Quantization">
+        <rect x="45" y="75" width="370" height="60" rx="10"/>
+        <text x="230" y="100" text-anchor="middle">Quantization</text>
+        <text class="sub" x="230" y="120" text-anchor="middle">fewer bits per weight → smaller, faster</text>
+      </g>
+      <g class="node c-violet" data-node="distillsm" tabindex="0" role="button" aria-label="Distillation">
+        <rect x="45" y="150" width="370" height="60" rx="10"/>
+        <text x="230" y="175" text-anchor="middle">Distillation</text>
+        <text class="sub" x="230" y="195" text-anchor="middle">small student learns from big teacher</text>
+      </g>
+      <g class="node c-aqua" data-node="arch" tabindex="0" role="button" aria-label="Architecture tweaks">
+        <rect x="45" y="225" width="370" height="60" rx="10"/>
+        <text x="230" y="250" text-anchor="middle">Architecture</text>
+        <text class="sub" x="230" y="270" text-anchor="middle">efficient attention, MoE, pruning</text>
+      </g>
+
+      <rect class="zone" x="465" y="30" width="410" height="270" rx="12"/>
+      <text class="title" x="485" y="58">Service level — serve it smarter</text>
+      <g class="node c-yellow" data-node="batch" tabindex="0" role="button" aria-label="Continuous batching">
+        <rect x="485" y="75" width="370" height="60" rx="10"/>
+        <text x="670" y="100" text-anchor="middle">Continuous batching</text>
+        <text class="sub" x="670" y="120" text-anchor="middle">share the GPU across requests</text>
+      </g>
+      <g class="node c-orange" data-node="cache" tabindex="0" role="button" aria-label="Caching">
+        <rect x="485" y="150" width="370" height="60" rx="10"/>
+        <text x="670" y="175" text-anchor="middle">Caching</text>
+        <text class="sub" x="670" y="195" text-anchor="middle">KV cache · prompt cache · response cache</text>
+      </g>
+      <g class="node c-magenta" data-node="spec" tabindex="0" role="button" aria-label="Speculative decoding">
+        <rect x="485" y="225" width="370" height="60" rx="10"/>
+        <text x="670" y="250" text-anchor="middle">Speculative decoding</text>
+        <text class="sub" x="670" y="270" text-anchor="middle">draft fast, verify with the big model</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a technique</span> — each has a tradeoff.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "quant": {"title": "Quantization", "body": "Store weights in fewer bits (16 → 8 → 4). Halving bits roughly halves memory and speeds up memory-bound decode. Small quality loss at 8-bit, noticeable at aggressive levels — evaluate on YOUR task, not just benchmarks. Usually the first optimization to try."},
+      "distillsm": {"title": "Distillation", "body": "Train a small model to match a big one on your task (Chapter 7's play, seen from the cost side). Biggest possible wins — 10× cheaper serving — but requires training and works best for narrow tasks rather than general chat."},
+      "arch": {"title": "Architecture", "body": "Efficient attention variants shrink the KV cache; mixture-of-experts activates only part of the network per token; pruning removes unimportant weights. Mostly the model provider's territory — but it explains why same-size models differ wildly in speed."},
+      "batch": {"title": "Continuous batching", "body": "GPUs are wasted on one request at a time. Batching processes many requests together, multiplying throughput per GPU; 'continuous' batching slots new requests in as others finish, avoiding the wait-for-the-batch problem. The core trick behind serving frameworks like vLLM."},
+      "cache": {"title": "Caching", "body": "Three layers: the KV cache reuses attention state within a generation (why decode works at all); prompt caching reuses the prefill of shared prefixes — a huge TTFT win when every request starts with the same long system prompt; response caching returns stored answers to repeated questions."},
+      "spec": {"title": "Speculative decoding", "body": "A small draft model proposes several tokens; the big model verifies them all in one parallel pass. Accepted tokens arrive several-at-a-time with identical output quality — one of the rare free lunches, at the cost of serving complexity."}
+    }
+    </script>
+  </figure>
+
+  <h2>Key takeaways</h2>
+  <ul class="takeaways">
+    <li><strong>Measure TTFT and TPOT separately</strong> First-token wait and streaming pace have different causes and different fixes.</li>
+    <li><strong>Output length is a latency lever</strong> Total time ≈ TTFT + TPOT × tokens. Concise outputs are the cheapest speedup available.</li>
+    <li><strong>Quantize first, distill for scale</strong> Quantization is cheap and usually safe; distillation is the big-ticket win for narrow, high-volume tasks.</li>
+    <li><strong>Serving tricks are quality-free wins</strong> Batching, prompt caching, and speculative decoding change cost and speed without changing outputs.</li>
+  </ul>
+
+  <h2>Check yourself</h2>
+  <section class="quiz">
+    <div class="quiz-body"></div>
+    <script type="application/json" class="quiz-data">
+    [
+      {"q": "Users complain your chatbot 'hangs' before starting to respond, though it streams fine afterward. Which metric is bad, and what's a likely cause?",
+       "opts": ["TPOT — the model is too big", "TTFT — long prompts making prefill slow (or queueing)", "Total tokens — answers too long", "Temperature too high"],
+       "a": 1,
+       "why": "The wait before the first token is TTFT, driven by queueing + prefill. Long RAG contexts are a classic cause; prompt caching and shorter contexts are classic fixes."},
+      {"q": "Every request starts with the same 3,000-token system prompt. Which optimization directly exploits this?",
+       "opts": ["Speculative decoding", "Prompt caching — reuse the prefill of the shared prefix", "Higher batch size", "Pruning"],
+       "a": 1,
+       "why": "Prompt caching stores the computed state of the shared prefix, so each request only prefills the new part — a large TTFT and cost win for exactly this setup."},
+      {"q": "What's the tradeoff when you quantize a model to fewer bits?",
+       "opts": ["It gets slower but smarter", "None — it's free", "Smaller and faster, but with potential quality loss you must evaluate on your task", "It requires more GPUs"],
+       "a": 2,
+       "why": "Quantization shrinks memory and speeds up memory-bound decoding, at the risk of quality degradation — mild at 8-bit, growing as you push lower. The verdict comes from your evals."},
+      {"q": "How does speculative decoding speed things up without changing output quality?",
+       "opts": ["It skips hard tokens", "A draft model proposes tokens and the target model verifies them in parallel, accepting only matches", "It caches previous answers", "It shortens the prompt"],
+       "a": 1,
+       "why": "The big model verifies the draft's proposals in one parallel pass and keeps only tokens it would have produced itself — same output, several tokens per verification step."}
+    ]
+    </script>
+  </section>
+
+  <div class="chapter-actions">
+    <button id="complete-btn" class="complete-btn" type="button">Mark chapter as complete</button>
+  </div>
+
+  <nav class="pager">
+    <a href="ch08.html"><span class="dir">← Previous</span>Dataset Engineering</a>
+    <a href="ch10.html"><span class="dir">Next chapter →</span>Architecture &amp; User Feedback</a>
+  </nav>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+<script src="../js/diagram.js"></script>
+<script src="../js/quiz.js"></script>
+</body>
+</html>

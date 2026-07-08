@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch 1 · Introduction to AI Engineering</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body data-chapter="ch01">
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="../index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Chapter 1 of 10</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="chapter-head">
+    <p class="kicker">Chapter 1</p>
+    <h1>Introduction to AI Engineering</h1>
+    <p class="lede">Foundation models flipped the old ML workflow on its head: instead of training a model
+    for your product, you now start from a powerful general-purpose model and adapt it. AI engineering is
+    the discipline of building applications on top of these models.</p>
+  </section>
+
+  <h2>From ML engineering to AI engineering</h2>
+  <p>The biggest shift: model development used to come first, now it comes last — if at all.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 250" role="img" aria-label="Comparison of the traditional ML workflow with the AI engineering workflow">
+      <defs>
+        <marker id="a11" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <text class="title" x="40" y="32">Traditional ML engineering</text>
+      <g class="node c-gray" data-node="ml-data" tabindex="0" role="button" aria-label="Collect and label data">
+        <rect x="40" y="45" width="190" height="58" rx="10"/>
+        <text x="135" y="70" text-anchor="middle">Collect &amp; label data</text>
+        <text class="sub" x="135" y="90" text-anchor="middle">expensive, slow</text>
+      </g>
+      <line class="edge" x1="230" y1="74" x2="278" y2="74" marker-end="url(#a11)"/>
+      <g class="node c-gray" data-node="ml-train" tabindex="0" role="button" aria-label="Train your own model">
+        <rect x="282" y="45" width="190" height="58" rx="10"/>
+        <text x="377" y="70" text-anchor="middle">Train your model</text>
+        <text class="sub" x="377" y="90" text-anchor="middle">one model per task</text>
+      </g>
+      <line class="edge" x1="472" y1="74" x2="520" y2="74" marker-end="url(#a11)"/>
+      <g class="node c-gray" data-node="ml-deploy" tabindex="0" role="button" aria-label="Deploy the model">
+        <rect x="524" y="45" width="160" height="58" rx="10"/>
+        <text x="604" y="70" text-anchor="middle">Deploy</text>
+        <text class="sub" x="604" y="90" text-anchor="middle">months later</text>
+      </g>
+
+      <text class="title" x="40" y="152">AI engineering</text>
+      <g class="node c-blue" data-node="ai-fm" tabindex="0" role="button" aria-label="Start from a foundation model">
+        <rect x="40" y="165" width="230" height="58" rx="10"/>
+        <text x="155" y="190" text-anchor="middle">Foundation model</text>
+        <text class="sub" x="155" y="210" text-anchor="middle">already trained by someone else</text>
+      </g>
+      <line class="edge" x1="270" y1="194" x2="318" y2="194" marker-end="url(#a11)"/>
+      <g class="node c-aqua" data-node="ai-adapt" tabindex="0" role="button" aria-label="Adapt the model">
+        <rect x="322" y="165" width="240" height="58" rx="10"/>
+        <text x="442" y="190" text-anchor="middle">Adapt</text>
+        <text class="sub" x="442" y="210" text-anchor="middle">prompt · RAG · finetune</text>
+      </g>
+      <line class="edge" x1="562" y1="194" x2="610" y2="194" marker-end="url(#a11)"/>
+      <g class="node c-violet" data-node="ai-eval" tabindex="0" role="button" aria-label="Evaluate and ship">
+        <rect x="614" y="165" width="200" height="58" rx="10"/>
+        <text x="714" y="190" text-anchor="middle">Evaluate &amp; ship</text>
+        <text class="sub" x="714" y="210" text-anchor="middle">days, not months</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click any block</span> to see what it means.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "ml-data": {"title": "Collect & label data", "body": "Classic ML starts by gathering a large, task-specific labeled dataset — often the slowest and most expensive part of the whole project. No data, no model."},
+      "ml-train": {"title": "Train your model", "body": "A dedicated model is trained from scratch (or from a small pretrained base) for one narrow task, like spam detection or demand forecasting. Every new task means a new model."},
+      "ml-deploy": {"title": "Deploy", "body": "After weeks or months of iteration, the model is deployed. The product only becomes testable at the very end of the pipeline."},
+      "ai-fm": {"title": "Foundation model", "body": "Large models pretrained on internet-scale data (like GPT or Claude) work out of the box on many tasks. Model development is now outsourced — you start from capability, not from zero."},
+      "ai-adapt": {"title": "Adapt", "body": "You mold the general model to your task: write better prompts, feed it your data with RAG, or finetune it. Adaptation techniques are the core skill set of AI engineering."},
+      "ai-eval": {"title": "Evaluate & ship", "body": "Because you can build a working demo in a day, the hard work shifts to evaluation: proving the product is good, safe, and reliable enough to ship."}
+    }
+    </script>
+  </figure>
+
+  <h2>The AI engineering stack</h2>
+  <p>Three layers of responsibility. Most application builders live in the top layer and reach into the lower two only when needed.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 270" role="img" aria-label="The three layers of the AI engineering stack">
+      <g class="node c-blue" data-node="app" tabindex="0" role="button" aria-label="Application development layer">
+        <rect x="60" y="20" width="780" height="62" rx="10"/>
+        <text x="450" y="46" text-anchor="middle">Application development</text>
+        <text class="sub" x="450" y="66" text-anchor="middle">prompt engineering · context construction · evaluation · AI interfaces</text>
+      </g>
+      <g class="node c-violet" data-node="model" tabindex="0" role="button" aria-label="Model development layer">
+        <rect x="60" y="104" width="780" height="62" rx="10"/>
+        <text x="450" y="130" text-anchor="middle">Model development</text>
+        <text class="sub" x="450" y="150" text-anchor="middle">dataset engineering · finetuning · inference optimization</text>
+      </g>
+      <g class="node c-aqua" data-node="infra" tabindex="0" role="button" aria-label="Infrastructure layer">
+        <rect x="60" y="188" width="780" height="62" rx="10"/>
+        <text x="450" y="214" text-anchor="middle">Infrastructure</text>
+        <text class="sub" x="450" y="234" text-anchor="middle">compute · data management · serving · monitoring</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a layer</span> to see what lives inside it.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "app": {"title": "Application development", "body": "Where most AI engineers work day to day: crafting prompts, giving the model the right context, designing the user-facing interface, and — above all — evaluating whether outputs are good. This layer changed the most with foundation models."},
+      "model": {"title": "Model development", "body": "The traditional ML layer: curating datasets, finetuning models, and optimizing inference so responses are fast and cheap. You dip into this layer when prompting alone can't hit your quality, latency, or cost targets."},
+      "infra": {"title": "Infrastructure", "body": "The foundation everything runs on: GPUs and compute management, data pipelines, model serving, and monitoring. Largely unchanged by the foundation-model wave — and still essential."}
+    }
+    </script>
+  </figure>
+
+  <h2>The adaptation ladder</h2>
+  <p>When building with a foundation model, climb this ladder from the bottom. Each step up buys more control — and costs much more effort.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 290" role="img" aria-label="Four adaptation techniques ordered by increasing cost and effort">
+      <defs>
+        <marker id="a13" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="prompt" tabindex="0" role="button" aria-label="Prompting">
+        <rect x="40" y="200" width="190" height="58" rx="10"/>
+        <text x="135" y="225" text-anchor="middle">1 · Prompting</text>
+        <text class="sub" x="135" y="245" text-anchor="middle">always try this first</text>
+      </g>
+      <g class="node c-aqua" data-node="rag" tabindex="0" role="button" aria-label="RAG">
+        <rect x="255" y="145" width="190" height="58" rx="10"/>
+        <text x="350" y="170" text-anchor="middle">2 · RAG</text>
+        <text class="sub" x="350" y="190" text-anchor="middle">add your knowledge</text>
+      </g>
+      <g class="node c-yellow" data-node="ft" tabindex="0" role="button" aria-label="Finetuning">
+        <rect x="470" y="90" width="190" height="58" rx="10"/>
+        <text x="565" y="115" text-anchor="middle">3 · Finetuning</text>
+        <text class="sub" x="565" y="135" text-anchor="middle">change its behavior</text>
+      </g>
+      <g class="node c-red" data-node="pretrain" tabindex="0" role="button" aria-label="Pretraining your own model">
+        <rect x="685" y="35" width="190" height="58" rx="10"/>
+        <text x="780" y="60" text-anchor="middle">4 · Pretraining</text>
+        <text class="sub" x="780" y="80" text-anchor="middle">rarely worth it</text>
+      </g>
+      <line class="edge" x1="233" y1="223" x2="251" y2="211" marker-end="url(#a13)"/>
+      <line class="edge" x1="448" y1="168" x2="466" y2="156" marker-end="url(#a13)"/>
+      <line class="edge" x1="663" y1="113" x2="681" y2="101" marker-end="url(#a13)"/>
+      <line class="edge dashed" x1="60" y1="278" x2="860" y2="278"/>
+      <text class="lbl" x="450" y="273" text-anchor="middle">increasing cost, effort &amp; control →</text>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a step</span> to see when to use it.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "prompt": {"title": "Prompting", "body": "Change what you ask, not the model. Clear instructions, examples, and output formats solve a surprising share of problems for near-zero cost. If prompting works, stop here."},
+      "rag": {"title": "RAG (retrieval-augmented generation)", "body": "The model doesn't know your private or recent data — so retrieve relevant documents and put them in the prompt. Use RAG when the problem is missing knowledge, not bad behavior."},
+      "ft": {"title": "Finetuning", "body": "Further train the model on your examples to change how it behaves: follow your format, adopt your style, master your domain. Costs data, compute, and an ongoing maintenance burden."},
+      "pretrain": {"title": "Pretraining your own model", "body": "Training a foundation model from scratch costs millions and a specialist team. Almost no application company needs this — it's listed here so you know where the ladder ends."}
+    }
+    </script>
+  </figure>
+
+  <h2>Key takeaways</h2>
+  <ul class="takeaways">
+    <li><strong>Start from capability</strong> AI engineering builds on pretrained foundation models — model development is now the last resort, not the first step.</li>
+    <li><strong>Adaptation is the skill</strong> Prompting, RAG, and finetuning are the core techniques. Learn when each one is the right tool.</li>
+    <li><strong>Evaluation is the bottleneck</strong> Demos are easy; proving quality is hard. Evaluation skill separates toy projects from products.</li>
+    <li><strong>Climb the ladder bottom-up</strong> Try the cheapest technique first. Only escalate when you've measured that the cheaper one falls short.</li>
+  </ul>
+
+  <h2>Check yourself</h2>
+  <section class="quiz">
+    <div class="quiz-body"></div>
+    <script type="application/json" class="quiz-data">
+    [
+      {"q": "What is the biggest workflow change foundation models introduced?",
+       "opts": ["Models are now trained faster from scratch", "You start from a pretrained general model and adapt it, instead of training your own", "Labeled data is no longer used anywhere", "Deployment no longer requires infrastructure"],
+       "a": 1,
+       "why": "Product development flipped: capability comes first (a pretrained model), then adaptation to your task. Training from scratch is now the rare exception."},
+      {"q": "Which technique should you try FIRST when a model underperforms on your task?",
+       "opts": ["Finetuning", "Pretraining a custom model", "Prompting improvements", "Buying more GPUs"],
+       "a": 2,
+       "why": "The adaptation ladder goes cheapest-first: prompting costs almost nothing to try, and often works. Escalate to RAG or finetuning only when measurement shows prompting isn't enough."},
+      {"q": "In the AI engineering stack, which layer changed most with foundation models?",
+       "opts": ["Infrastructure", "Model development", "Application development", "None — all layers are new"],
+       "a": 2,
+       "why": "Prompting, context construction, and AI interfaces barely existed before. Infrastructure and model development are older disciplines that carried over."},
+      {"q": "Your model lacks knowledge of your company's internal docs. What is the most fitting fix?",
+       "opts": ["RAG — retrieve the docs into the prompt", "Higher temperature", "Pretraining from scratch", "A longer system prompt telling it to know the docs"],
+       "a": 0,
+       "why": "Missing knowledge is a retrieval problem: RAG injects the relevant documents as context. Finetuning changes behavior, not knowledge freshness, and prompts can't conjure facts the model never saw."}
+    ]
+    </script>
+  </section>
+
+  <div class="chapter-actions">
+    <button id="complete-btn" class="complete-btn" type="button">Mark chapter as complete</button>
+  </div>
+
+  <nav class="pager">
+    <a href="../index.html"><span class="dir">← Back to</span>All chapters</a>
+    <a href="ch02.html"><span class="dir">Next chapter →</span>Understanding Foundation Models</a>
+  </nav>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+<script src="../js/diagram.js"></script>
+<script src="../js/quiz.js"></script>
+</body>
+</html>

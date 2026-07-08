@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch 2 · Understanding Foundation Models</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body data-chapter="ch02">
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="../index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Chapter 2 of 10</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="chapter-head">
+    <p class="kicker">Chapter 2</p>
+    <h1>Understanding Foundation Models</h1>
+    <p class="lede">You don't need to build a foundation model, but you do need to understand one: how it was
+    trained, how it produces text one token at a time, and which dials change its output. These mental
+    models explain most of the model behavior you'll ever debug.</p>
+  </section>
+
+  <h2>How a foundation model is made</h2>
+  <p>Three training stages take a model from "autocomplete on the whole internet" to a helpful assistant.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 140" role="img" aria-label="The three training stages of a foundation model">
+      <defs>
+        <marker id="a21" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="pretrain" tabindex="0" role="button" aria-label="Pretraining">
+        <rect x="30" y="35" width="195" height="62" rx="10"/>
+        <text x="127" y="61" text-anchor="middle">Pretraining</text>
+        <text class="sub" x="127" y="81" text-anchor="middle">predict the next token</text>
+      </g>
+      <line class="edge" x1="225" y1="66" x2="265" y2="66" marker-end="url(#a21)"/>
+      <g class="node c-aqua" data-node="sft" tabindex="0" role="button" aria-label="Supervised finetuning">
+        <rect x="269" y="35" width="195" height="62" rx="10"/>
+        <text x="366" y="61" text-anchor="middle">Supervised finetuning</text>
+        <text class="sub" x="366" y="81" text-anchor="middle">learn to follow instructions</text>
+      </g>
+      <line class="edge" x1="464" y1="66" x2="504" y2="66" marker-end="url(#a21)"/>
+      <g class="node c-violet" data-node="pref" tabindex="0" role="button" aria-label="Preference finetuning">
+        <rect x="508" y="35" width="195" height="62" rx="10"/>
+        <text x="605" y="61" text-anchor="middle">Preference tuning</text>
+        <text class="sub" x="605" y="81" text-anchor="middle">RLHF / DPO — align to humans</text>
+      </g>
+      <line class="edge" x1="703" y1="66" x2="743" y2="66" marker-end="url(#a21)"/>
+      <g class="node c-green" data-node="chat" tabindex="0" role="button" aria-label="The assistant model">
+        <rect x="747" y="35" width="130" height="62" rx="10"/>
+        <text x="812" y="61" text-anchor="middle">Assistant</text>
+        <text class="sub" x="812" y="81" text-anchor="middle">what you use</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click any stage</span> to see what happens there.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "pretrain": {"title": "Pretraining", "body": "The model reads trillions of tokens of text and learns one skill: predict the next token. This self-supervised game — no human labels needed — is where nearly all of its knowledge and reasoning ability comes from. The result is a 'base model': great at completing text, terrible at conversation."},
+      "sft": {"title": "Supervised finetuning (SFT)", "body": "The base model is trained on curated (instruction → good response) pairs written or selected by humans. It learns the format of being helpful: answer the question, follow the instruction, stay on topic."},
+      "pref": {"title": "Preference finetuning", "body": "Humans (or AI judges) rank pairs of responses, and the model is optimized toward preferred ones — via RLHF (a reward model plus reinforcement learning) or simpler methods like DPO. This makes it more helpful, harmless, and honest — and gives models their characteristic style."},
+      "chat": {"title": "The assistant model", "body": "The finished chat model you call through an API. Under the hood it is still a next-token predictor — post-training shaped its behavior, not its fundamental mechanics."}
+    }
+    </script>
+  </figure>
+
+  <h2>How text gets generated — one token at a time</h2>
+  <p>Every response you've ever seen from an LLM was produced by this loop, run once per token.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 230" role="img" aria-label="The token generation loop">
+      <defs>
+        <marker id="a22" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="prompt" tabindex="0" role="button" aria-label="Prompt">
+        <rect x="30" y="60" width="140" height="62" rx="10"/>
+        <text x="100" y="86" text-anchor="middle">Prompt</text>
+        <text class="sub" x="100" y="106" text-anchor="middle">your input text</text>
+      </g>
+      <line class="edge" x1="170" y1="91" x2="206" y2="91" marker-end="url(#a22)"/>
+      <g class="node c-aqua" data-node="tokenize" tabindex="0" role="button" aria-label="Tokenizer">
+        <rect x="210" y="60" width="150" height="62" rx="10"/>
+        <text x="285" y="86" text-anchor="middle">Tokenizer</text>
+        <text class="sub" x="285" y="106" text-anchor="middle">text → tokens</text>
+      </g>
+      <line class="edge" x1="360" y1="91" x2="396" y2="91" marker-end="url(#a22)"/>
+      <g class="node c-violet" data-node="model" tabindex="0" role="button" aria-label="Transformer model">
+        <rect x="400" y="60" width="180" height="62" rx="10"/>
+        <text x="490" y="86" text-anchor="middle">Transformer</text>
+        <text class="sub" x="490" y="106" text-anchor="middle">probability for every token</text>
+      </g>
+      <line class="edge" x1="580" y1="91" x2="616" y2="91" marker-end="url(#a22)"/>
+      <g class="node c-yellow" data-node="sample" tabindex="0" role="button" aria-label="Sampling">
+        <rect x="620" y="60" width="150" height="62" rx="10"/>
+        <text x="695" y="86" text-anchor="middle">Sampling</text>
+        <text class="sub" x="695" y="106" text-anchor="middle">pick one token</text>
+      </g>
+      <line class="edge" x1="770" y1="91" x2="806" y2="91" marker-end="url(#a22)"/>
+      <g class="node c-orange" data-node="token" tabindex="0" role="button" aria-label="Next token">
+        <rect x="810" y="60" width="70" height="62" rx="10"/>
+        <text x="845" y="97" text-anchor="middle">“the”</text>
+      </g>
+      <path class="edge dashed" d="M845 122 L845 175 L490 175 L490 128" marker-end="url(#a22)"/>
+      <text class="lbl" x="667" y="192" text-anchor="middle">append token &amp; repeat — until a stop token or the length limit</text>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click any step</span> of the loop.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "prompt": {"title": "Prompt", "body": "Everything the model can see: the system prompt, the conversation so far, retrieved context. If it's not in the prompt (or the weights), the model doesn't know it."},
+      "tokenize": {"title": "Tokenizer", "body": "Text is split into tokens — chunks of roughly ¾ of a word. Models are priced, limited, and slowed per token, which is why token counts matter so much in practice. Odd tokenization also explains classic failures like miscounting letters in a word."},
+      "model": {"title": "Transformer", "body": "The neural network processes all tokens (attention lets each token look at every other) and outputs a probability for every token in its vocabulary as the possible next one. It does this — and only this."},
+      "sample": {"title": "Sampling", "body": "One token is picked from that probability distribution. Temperature, top-p, and top-k control how adventurous the pick is. Because it's sampling, the same prompt can give different answers each run."},
+      "token": {"title": "Next token", "body": "The chosen token is appended to the sequence, and the whole loop runs again for the token after it. A 500-token answer means 500 trips around this loop — which is why long outputs are slow."}
+    }
+    </script>
+  </figure>
+
+  <h2>The sampling dials</h2>
+  <p>Three controls shape how the next token gets picked. They're the first thing to check when output is too random — or too repetitive.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 150" role="img" aria-label="The three sampling controls: temperature, top-p and top-k, stopping conditions">
+      <g class="node c-blue" data-node="temp" tabindex="0" role="button" aria-label="Temperature">
+        <rect x="30" y="40" width="260" height="70" rx="10"/>
+        <text x="160" y="68" text-anchor="middle">Temperature</text>
+        <text class="sub" x="160" y="90" text-anchor="middle">low = focused · high = creative</text>
+      </g>
+      <g class="node c-aqua" data-node="topp" tabindex="0" role="button" aria-label="Top-p and top-k">
+        <rect x="320" y="40" width="260" height="70" rx="10"/>
+        <text x="450" y="68" text-anchor="middle">Top-p / top-k</text>
+        <text class="sub" x="450" y="90" text-anchor="middle">shrink the candidate pool</text>
+      </g>
+      <g class="node c-violet" data-node="stop" tabindex="0" role="button" aria-label="Stopping conditions">
+        <rect x="610" y="40" width="260" height="70" rx="10"/>
+        <text x="740" y="68" text-anchor="middle">Stopping</text>
+        <text class="sub" x="740" y="90" text-anchor="middle">stop sequences · max tokens</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a dial</span> to see how to use it.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "temp": {"title": "Temperature", "body": "Rescales the probability distribution before sampling. Near 0, the model almost always picks the most likely token — good for extraction, classification, and code. Higher values flatten the distribution — good for brainstorming and creative writing, at the cost of more mistakes."},
+      "topp": {"title": "Top-p / top-k", "body": "Instead of considering every token, restrict sampling to the top k tokens (top-k) or the smallest set whose probabilities sum to p (top-p, 'nucleus sampling'). This cuts off the long tail of weird tokens while keeping some variety."},
+      "stop": {"title": "Stopping conditions", "body": "Generation ends when the model emits a stop token, hits a stop sequence you define, or reaches the max-token limit. If responses get cut off mid-sentence, check the max-token setting before blaming the model."}
+    }
+    </script>
+  </figure>
+
+  <h2>Key takeaways</h2>
+  <ul class="takeaways">
+    <li><strong>It only predicts the next token</strong> All apparent reasoning, knowledge, and style emerge from that one trick applied at scale.</li>
+    <li><strong>Base ≠ assistant</strong> Pretraining creates capability; supervised and preference finetuning create the helpful behavior you actually interact with.</li>
+    <li><strong>Outputs are samples</strong> The same prompt can produce different answers. Design and evaluate for a distribution, not a single response.</li>
+    <li><strong>Know your dials</strong> Temperature and top-p trade consistency for creativity; token limits explain many "truncated" bugs.</li>
+  </ul>
+
+  <h2>Check yourself</h2>
+  <section class="quiz">
+    <div class="quiz-body"></div>
+    <script type="application/json" class="quiz-data">
+    [
+      {"q": "What single task is a language model trained to do during pretraining?",
+       "opts": ["Answer questions truthfully", "Predict the next token", "Follow instructions", "Retrieve documents"],
+       "a": 1,
+       "why": "Pretraining is pure next-token prediction on massive text. Question-answering and instruction-following are behaviors added later by post-training."},
+      {"q": "Why can the same prompt give different answers on different runs?",
+       "opts": ["The model retrains between calls", "The tokenizer is random", "The next token is sampled from a probability distribution", "APIs cache old answers"],
+       "a": 2,
+       "why": "Generation samples from the model's probability distribution over tokens. Unless temperature is 0 (and often even then), different runs can take different paths."},
+      {"q": "You're building a data-extraction feature and want maximally consistent output. Which setting helps most?",
+       "opts": ["Temperature near 0", "Temperature near 2", "A bigger max-token limit", "Removing the system prompt"],
+       "a": 0,
+       "why": "Low temperature makes the model nearly always pick the highest-probability token, which maximizes consistency — the right default for extraction, classification, and structured output."},
+      {"q": "What does preference finetuning (RLHF/DPO) primarily change?",
+       "opts": ["The model's vocabulary size", "The knowledge learned in pretraining", "Which kinds of responses the model favors", "The speed of inference"],
+       "a": 2,
+       "why": "Preference tuning optimizes the model toward responses humans rate higher — shaping helpfulness, tone, and safety. The underlying knowledge still comes from pretraining."}
+    ]
+    </script>
+  </section>
+
+  <div class="chapter-actions">
+    <button id="complete-btn" class="complete-btn" type="button">Mark chapter as complete</button>
+  </div>
+
+  <nav class="pager">
+    <a href="ch01.html"><span class="dir">← Previous</span>Introduction to AI Engineering</a>
+    <a href="ch03.html"><span class="dir">Next chapter →</span>Evaluation Methodology</a>
+  </nav>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+<script src="../js/diagram.js"></script>
+<script src="../js/quiz.js"></script>
+</body>
+</html>

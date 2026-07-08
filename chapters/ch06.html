@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch 6 · RAG &amp; Agents</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body data-chapter="ch06">
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="../index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Chapter 6 of 10</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="chapter-head">
+    <p class="kicker">Chapter 6</p>
+    <h1>RAG &amp; Agents</h1>
+    <p class="lede">Two patterns extend what a model can do: <strong>RAG</strong> gives it knowledge it doesn't
+    have, and <strong>agents</strong> give it the ability to act — planning, using tools, and iterating toward
+    a goal.</p>
+  </section>
+
+  <h2>The RAG pipeline</h2>
+  <p>Retrieval-augmented generation has two halves: an offline indexing job, and an online query path that
+  assembles the best context for each question.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 320" role="img" aria-label="The RAG pipeline: offline indexing of documents and online retrieval at query time">
+      <defs>
+        <marker id="a61" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <text class="title" x="30" y="28">Offline — index your knowledge</text>
+      <g class="node c-gray" data-node="docs" tabindex="0" role="button" aria-label="Documents">
+        <rect x="30" y="42" width="165" height="56" rx="10"/>
+        <text x="112" y="66" text-anchor="middle">Documents</text>
+        <text class="sub" x="112" y="86" text-anchor="middle">wikis, PDFs, tickets</text>
+      </g>
+      <line class="edge" x1="195" y1="70" x2="228" y2="70" marker-end="url(#a61)"/>
+      <g class="node c-aqua" data-node="chunk" tabindex="0" role="button" aria-label="Chunking">
+        <rect x="232" y="42" width="150" height="56" rx="10"/>
+        <text x="307" y="66" text-anchor="middle">Chunk</text>
+        <text class="sub" x="307" y="86" text-anchor="middle">split into passages</text>
+      </g>
+      <line class="edge" x1="382" y1="70" x2="415" y2="70" marker-end="url(#a61)"/>
+      <g class="node c-violet" data-node="embed" tabindex="0" role="button" aria-label="Embedding">
+        <rect x="419" y="42" width="150" height="56" rx="10"/>
+        <text x="494" y="66" text-anchor="middle">Embed</text>
+        <text class="sub" x="494" y="86" text-anchor="middle">passage → vector</text>
+      </g>
+      <line class="edge" x1="569" y1="70" x2="602" y2="70" marker-end="url(#a61)"/>
+      <g class="node c-blue" data-node="index" tabindex="0" role="button" aria-label="Vector index">
+        <rect x="606" y="42" width="165" height="56" rx="10"/>
+        <text x="688" y="66" text-anchor="middle">Vector index</text>
+        <text class="sub" x="688" y="86" text-anchor="middle">searchable by meaning</text>
+      </g>
+
+      <text class="title" x="30" y="152">Online — every query</text>
+      <g class="node c-blue" data-node="query" tabindex="0" role="button" aria-label="User query">
+        <rect x="30" y="166" width="140" height="56" rx="10"/>
+        <text x="100" y="190" text-anchor="middle">Query</text>
+        <text class="sub" x="100" y="210" text-anchor="middle">user question</text>
+      </g>
+      <line class="edge" x1="170" y1="194" x2="203" y2="194" marker-end="url(#a61)"/>
+      <g class="node c-aqua" data-node="retrieve" tabindex="0" role="button" aria-label="Retrieve">
+        <rect x="207" y="166" width="150" height="56" rx="10"/>
+        <text x="282" y="190" text-anchor="middle">Retrieve</text>
+        <text class="sub" x="282" y="210" text-anchor="middle">top-k passages</text>
+      </g>
+      <line class="edge dashed" x1="688" y1="98" x2="300" y2="163" marker-end="url(#a61)"/>
+      <line class="edge" x1="357" y1="194" x2="390" y2="194" marker-end="url(#a61)"/>
+      <g class="node c-yellow" data-node="rerank" tabindex="0" role="button" aria-label="Rerank">
+        <rect x="394" y="166" width="150" height="56" rx="10"/>
+        <text x="469" y="190" text-anchor="middle">Rerank</text>
+        <text class="sub" x="469" y="210" text-anchor="middle">keep the best few</text>
+      </g>
+      <line class="edge" x1="544" y1="194" x2="577" y2="194" marker-end="url(#a61)"/>
+      <g class="node c-violet" data-node="genprompt" tabindex="0" role="button" aria-label="Prompt with context">
+        <rect x="581" y="166" width="150" height="56" rx="10"/>
+        <text x="656" y="190" text-anchor="middle">Prompt</text>
+        <text class="sub" x="656" y="210" text-anchor="middle">query + context</text>
+      </g>
+      <line class="edge" x1="731" y1="194" x2="764" y2="194" marker-end="url(#a61)"/>
+      <g class="node c-green" data-node="answer" tabindex="0" role="button" aria-label="Grounded answer">
+        <rect x="768" y="166" width="105" height="56" rx="10"/>
+        <text x="820" y="190" text-anchor="middle">Answer</text>
+        <text class="sub" x="820" y="210" text-anchor="middle">grounded</text>
+      </g>
+      <text class="lbl" x="450" y="280" text-anchor="middle">retrieval quality caps answer quality — most RAG failures are retrieval failures, not model failures</text>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click any stage</span> of either half.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "docs": {"title": "Documents", "body": "Your knowledge source: internal wikis, product docs, support tickets, contracts. RAG quality starts with source quality — stale or contradictory documents produce confidently wrong answers."},
+      "chunk": {"title": "Chunk", "body": "Documents are split into retrievable passages. Chunk size is a real tradeoff: too small loses context, too large dilutes relevance and wastes tokens. Respecting natural boundaries (sections, paragraphs) usually beats fixed-size splits."},
+      "embed": {"title": "Embed", "body": "An embedding model converts each chunk into a vector that captures its meaning, so 'How do I get my money back?' can match a passage about refund policy despite sharing no keywords."},
+      "index": {"title": "Vector index", "body": "The vectors live in a database built for nearest-neighbor search, which finds the most semantically similar chunks in milliseconds even across millions of them."},
+      "query": {"title": "Query", "body": "The user's question — often rewritten first (expanded, decontextualized from chat history) because raw user phrasing is frequently a poor search query."},
+      "retrieve": {"title": "Retrieve", "body": "The query is embedded and the index returns the top-k most similar chunks. This step caps everything downstream: if the right passage isn't retrieved, no model can answer correctly."},
+      "rerank": {"title": "Rerank", "body": "A second, more accurate model re-scores the candidates against the query and keeps only the best few. Cheap first pass, precise second pass — better answers and fewer wasted context tokens."},
+      "genprompt": {"title": "Prompt assembly", "body": "The winning chunks are placed into the prompt as clearly delimited context, with instructions to answer from it — and to say so when the context doesn't contain the answer."},
+      "answer": {"title": "Grounded answer", "body": "The model answers from the supplied passages instead of its parametric memory — enabling citations, up-to-date knowledge, and far fewer hallucinations on your domain."}
+    }
+    </script>
+  </figure>
+
+  <h2>Retrieval strategies</h2>
+  <p>Semantic search isn't the only option — and the best systems combine two.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 240" role="img" aria-label="Term-based and embedding-based retrieval combining into hybrid search">
+      <defs>
+        <marker id="a62" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="term" tabindex="0" role="button" aria-label="Term-based retrieval">
+        <rect x="60" y="30" width="300" height="70" rx="10"/>
+        <text x="210" y="59" text-anchor="middle">Term-based (BM25)</text>
+        <text class="sub" x="210" y="81" text-anchor="middle">matches keywords — fast, exact, cheap</text>
+      </g>
+      <g class="node c-violet" data-node="dense" tabindex="0" role="button" aria-label="Embedding-based retrieval">
+        <rect x="540" y="30" width="300" height="70" rx="10"/>
+        <text x="690" y="59" text-anchor="middle">Embedding-based</text>
+        <text class="sub" x="690" y="81" text-anchor="middle">matches meaning — handles paraphrase</text>
+      </g>
+      <line class="edge" x1="240" y1="100" x2="390" y2="155" marker-end="url(#a62)"/>
+      <line class="edge" x1="660" y1="100" x2="510" y2="155" marker-end="url(#a62)"/>
+      <g class="node c-green" data-node="hybrid" tabindex="0" role="button" aria-label="Hybrid search">
+        <rect x="300" y="160" width="300" height="70" rx="10"/>
+        <text x="450" y="189" text-anchor="middle">Hybrid + rerank</text>
+        <text class="sub" x="450" y="211" text-anchor="middle">combine both, then re-score</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a strategy</span> to compare them.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "term": {"title": "Term-based (BM25)", "body": "Classic keyword search, scoring documents by matching terms. Unbeatable for exact identifiers — error codes, product names, function names — and essentially free. Its weakness: no keywords in common, no match, however related the meaning."},
+      "dense": {"title": "Embedding-based (dense retrieval)", "body": "Retrieves by vector similarity, so 'refund my purchase' finds the returns policy. Its weakness is term-based search's strength: rare exact strings like 'ERR_4032' may embed poorly and get missed."},
+      "hybrid": {"title": "Hybrid + rerank", "body": "Run both, merge the candidate lists, and let a reranker pick the winners. Each method covers the other's blind spot — this combination is the default answer for production retrieval."}
+    }
+    </script>
+  </figure>
+
+  <h2>The agent loop</h2>
+  <p>An agent is a model in a loop: it plans, acts through tools, observes what happened, and repeats until the goal is met.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 320" role="img" aria-label="The agent loop: plan, act, observe, reflect, with tools and a completion exit">
+      <defs>
+        <marker id="a63" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="goal" tabindex="0" role="button" aria-label="Goal">
+        <rect x="30" y="125" width="150" height="60" rx="10"/>
+        <text x="105" y="150" text-anchor="middle">Goal</text>
+        <text class="sub" x="105" y="170" text-anchor="middle">“book my trip”</text>
+      </g>
+      <line class="edge" x1="180" y1="155" x2="243" y2="155" marker-end="url(#a63)"/>
+      <g class="node c-violet" data-node="plan" tabindex="0" role="button" aria-label="Plan">
+        <rect x="248" y="40" width="170" height="60" rx="10"/>
+        <text x="333" y="65" text-anchor="middle">Plan</text>
+        <text class="sub" x="333" y="85" text-anchor="middle">break into steps</text>
+      </g>
+      <g class="node c-yellow" data-node="act" tabindex="0" role="button" aria-label="Act with a tool">
+        <rect x="500" y="40" width="170" height="60" rx="10"/>
+        <text x="585" y="65" text-anchor="middle">Act</text>
+        <text class="sub" x="585" y="85" text-anchor="middle">call a tool</text>
+      </g>
+      <g class="node c-aqua" data-node="observe" tabindex="0" role="button" aria-label="Observe">
+        <rect x="500" y="200" width="170" height="60" rx="10"/>
+        <text x="585" y="225" text-anchor="middle">Observe</text>
+        <text class="sub" x="585" y="245" text-anchor="middle">read the result</text>
+      </g>
+      <g class="node c-magenta" data-node="reflect" tabindex="0" role="button" aria-label="Reflect">
+        <rect x="248" y="200" width="170" height="60" rx="10"/>
+        <text x="333" y="225" text-anchor="middle">Reflect</text>
+        <text class="sub" x="333" y="245" text-anchor="middle">on track? adjust?</text>
+      </g>
+      <line class="edge" x1="418" y1="70" x2="495" y2="70" marker-end="url(#a63)"/>
+      <line class="edge" x1="585" y1="100" x2="585" y2="195" marker-end="url(#a63)"/>
+      <line class="edge" x1="500" y1="230" x2="423" y2="230" marker-end="url(#a63)"/>
+      <line class="edge" x1="333" y1="200" x2="333" y2="105" marker-end="url(#a63)"/>
+      <line class="edge" x1="418" y1="243" x2="708" y2="290" marker-end="url(#a63)"/>
+      <g class="node c-green" data-node="done" tabindex="0" role="button" aria-label="Done">
+        <rect x="713" y="265" width="157" height="50" rx="10"/>
+        <text x="791" y="296" text-anchor="middle">Done ✓</text>
+      </g>
+      <g class="node c-orange" data-node="tools" tabindex="0" role="button" aria-label="Tools">
+        <rect x="713" y="30" width="157" height="130" rx="10"/>
+        <text x="791" y="60" text-anchor="middle">Tools</text>
+        <text class="sub" x="791" y="84" text-anchor="middle">web search</text>
+        <text class="sub" x="791" y="104" text-anchor="middle">code execution</text>
+        <text class="sub" x="791" y="124" text-anchor="middle">APIs &amp; databases</text>
+        <text class="sub" x="791" y="144" text-anchor="middle">other agents</text>
+      </g>
+      <line class="edge dashed" x1="670" y1="70" x2="708" y2="70" marker-end="url(#a63)"/>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click around the loop</span> — including the exit.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "goal": {"title": "Goal", "body": "Agents take an outcome, not an instruction: 'find and book the cheapest flight' rather than 'call the flights API'. The fuzzier the goal, the more the agent's judgment — and your guardrails — matter."},
+      "plan": {"title": "Plan", "body": "The model decomposes the goal into steps and picks the next action. Planning quality is the single biggest driver of agent success — weak plans waste every subsequent step, so complex agents often validate plans before executing them."},
+      "act": {"title": "Act", "body": "The model emits a structured tool call — 'search_flights(SFO→NYC, May 3)' — and your code executes it. The model never acts directly; your executor is the enforcement point for permissions and approval gates."},
+      "observe": {"title": "Observe", "body": "Tool output (results, errors, page content) is fed back into the context. Agents burn context fast — managing what to keep, summarize, or drop is a core engineering problem."},
+      "reflect": {"title": "Reflect", "body": "Is the goal met? Did the step fail? Should the plan change? Reflection catches errors early — vital because in a multi-step chain, small per-step error rates compound: 95% per step is only ~60% over ten steps."},
+      "done": {"title": "Done", "body": "Every agent needs explicit exits: goal achieved, step budget exhausted, or stuck — ask the human. Agents without termination criteria loop, and every loop costs tokens and money."},
+      "tools": {"title": "Tools", "body": "Tools define what the agent CAN do — read-only ones (search, retrieval) extend its knowledge; write ones (send email, execute code, book tickets) extend its power and risk. Grant the minimum set, and gate destructive actions on human approval."}
+    }
+    </script>
+  </figure>
+
+  <h2>Key takeaways</h2>
+  <ul class="takeaways">
+    <li><strong>RAG = search + prompt</strong> Its quality ceiling is retrieval quality. Debug the retriever before blaming the model.</li>
+    <li><strong>Hybrid beats either alone</strong> Keyword search catches exact terms, embeddings catch meaning — combine and rerank.</li>
+    <li><strong>Agents are models in loops</strong> Plan → act → observe → reflect, with tools as their hands. Your executor controls what those hands can touch.</li>
+    <li><strong>Errors compound</strong> Multi-step autonomy multiplies per-step failure rates. Reflection, step budgets, and human gates keep agents safe and solvent.</li>
+  </ul>
+
+  <h2>Check yourself</h2>
+  <section class="quiz">
+    <div class="quiz-body"></div>
+    <script type="application/json" class="quiz-data">
+    [
+      {"q": "Your RAG bot gives wrong answers even though the correct info exists in your docs. Where should you look first?",
+       "opts": ["The model's temperature", "The retrieval step — is the right chunk being found and ranked highly?", "The output format", "The vector database vendor"],
+       "a": 1,
+       "why": "Most RAG failures are retrieval failures: the right passage was never retrieved, was chunked badly, or ranked below the cutoff. Inspect what context the model actually received before touching anything else."},
+      {"q": "A user searches for error code 'ERR_4032'. Which retrieval method is most likely to nail it?",
+       "opts": ["Embedding-based search", "Term-based (BM25) keyword search", "Asking the model directly", "Increasing top-k"],
+       "a": 1,
+       "why": "Exact rare strings are keyword search's home turf — embeddings often represent arbitrary codes poorly. This asymmetry is exactly why hybrid search is the production default."},
+      {"q": "An agent completes each step correctly 95% of the time. Roughly how often does a 10-step task fully succeed?",
+       "opts": ["95%", "About 85%", "About 60%", "About 10%"],
+       "a": 2,
+       "why": "0.95¹⁰ ≈ 0.60. Compounding is why long agent chains need reflection, checkpoints, and the ability to recover from failed steps — not just a good model."},
+      {"q": "What's the safest way to let an agent use a tool that deletes customer records?",
+       "opts": ["Trust the system prompt to prevent misuse", "Don't expose it — or gate it behind human approval", "Lower the temperature", "Let the agent confirm with itself twice"],
+       "a": 1,
+       "why": "Prompts can be manipulated (Chapter 5!), so enforcement must live in the executor: least privilege, and human sign-off for destructive actions. If the agent doesn't need the tool, don't give it the tool."}
+    ]
+    </script>
+  </section>
+
+  <div class="chapter-actions">
+    <button id="complete-btn" class="complete-btn" type="button">Mark chapter as complete</button>
+  </div>
+
+  <nav class="pager">
+    <a href="ch05.html"><span class="dir">← Previous</span>Prompt Engineering</a>
+    <a href="ch07.html"><span class="dir">Next chapter →</span>Finetuning</a>
+  </nav>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+<script src="../js/diagram.js"></script>
+<script src="../js/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Engineering, Visualized — Learn by Diagram</title>
+<meta name="description" content="Learn the skills of AI engineering through simple interactive diagrams, chapter by chapter — based on concepts from Chip Huyen's AI Engineering.">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Learn by diagram · 10 chapters</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="hero">
+    <p class="kicker">Visual learning path</p>
+    <h1>AI Engineering, one diagram at a time</h1>
+    <p class="lede">Every core skill from Chip Huyen's <em>AI Engineering</em>, distilled into simple
+    interactive diagrams. Click any block in a diagram to learn what it means, test yourself with a
+    short quiz, and track your progress as you go.</p>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Your progress</span>
+        <span id="progress-count">0 of 10 chapters complete</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </section>
+
+  <section class="chapter-grid">
+    <a class="card" href="chapters/ch01.html" data-ch="ch01">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 1</span>
+      <h3>Introduction to AI Engineering</h3>
+      <p class="ch-desc">Why foundation models changed the game, the AI engineering stack, and when to build with AI.</p>
+    </a>
+    <a class="card" href="chapters/ch02.html" data-ch="ch02">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 2</span>
+      <h3>Understanding Foundation Models</h3>
+      <p class="ch-desc">How models are trained, how they generate text token by token, and the dials that shape output.</p>
+    </a>
+    <a class="card" href="chapters/ch03.html" data-ch="ch03">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 3</span>
+      <h3>Evaluation Methodology</h3>
+      <p class="ch-desc">Why evaluating open-ended AI is hard, and the toolbox: exact match, similarity, and AI judges.</p>
+    </a>
+    <a class="card" href="chapters/ch04.html" data-ch="ch04">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 4</span>
+      <h3>Evaluating AI Systems</h3>
+      <p class="ch-desc">Choosing evaluation criteria, selecting the right model, and building your own eval pipeline.</p>
+    </a>
+    <a class="card" href="chapters/ch05.html" data-ch="ch05">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 5</span>
+      <h3>Prompt Engineering</h3>
+      <p class="ch-desc">The anatomy of a great prompt, in-context learning, and defending against prompt attacks.</p>
+    </a>
+    <a class="card" href="chapters/ch06.html" data-ch="ch06">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 6</span>
+      <h3>RAG &amp; Agents</h3>
+      <p class="ch-desc">Giving models knowledge with retrieval pipelines, and giving them abilities with agent loops and tools.</p>
+    </a>
+    <a class="card" href="chapters/ch07.html" data-ch="ch07">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 7</span>
+      <h3>Finetuning</h3>
+      <p class="ch-desc">When finetuning beats prompting, how LoRA makes it cheap, and finetuning vs RAG.</p>
+    </a>
+    <a class="card" href="chapters/ch08.html" data-ch="ch08">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 8</span>
+      <h3>Dataset Engineering</h3>
+      <p class="ch-desc">Data quality, coverage and quantity — plus curation pipelines and synthetic data.</p>
+    </a>
+    <a class="card" href="chapters/ch09.html" data-ch="ch09">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 9</span>
+      <h3>Inference Optimization</h3>
+      <p class="ch-desc">Latency metrics that matter (TTFT, TPOT) and the techniques that make models fast and cheap.</p>
+    </a>
+    <a class="card" href="chapters/ch10.html" data-ch="ch10">
+      <span class="badge" hidden>✓ Done</span>
+      <span class="ch-num">Chapter 10</span>
+      <h3>Architecture &amp; User Feedback</h3>
+      <p class="ch-desc">Assembling the full AI application architecture, step by step, and closing the feedback loop.</p>
+    </a>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+    Read the book for the full depth — this site is the map, not the territory.
+  </div>
+</footer>
+
+<script src="js/app.js"></script>
+</body>
+</html>

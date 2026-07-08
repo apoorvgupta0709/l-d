@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch 4 · Evaluating AI Systems</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body data-chapter="ch04">
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="../index.html">AI Engineering<span class="dot">.</span>viz</a>
+    <span class="header-meta">Chapter 4 of 10</span>
+  </div>
+</header>
+
+<main class="container">
+  <section class="chapter-head">
+    <p class="kicker">Chapter 4</p>
+    <h1>Evaluating AI Systems</h1>
+    <p class="lede">Chapter 3 gave you scoring methods; this chapter is about using them on <em>your</em> system:
+    deciding what to measure, picking the right model from hundreds of options, and building an evaluation
+    pipeline you can trust release after release.</p>
+  </section>
+
+  <h2>What to measure — the criteria</h2>
+  <p>"Is it good?" breaks down into four families of criteria. Define yours before you look at a single leaderboard.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 220" role="img" aria-label="Four families of evaluation criteria">
+      <g class="node c-blue" data-node="domain" tabindex="0" role="button" aria-label="Domain capability">
+        <rect x="30" y="25" width="415" height="75" rx="10"/>
+        <text x="237" y="56" text-anchor="middle">Domain capability</text>
+        <text class="sub" x="237" y="78" text-anchor="middle">can it actually do your task? code, law, medicine…</text>
+      </g>
+      <g class="node c-aqua" data-node="gen" tabindex="0" role="button" aria-label="Generation quality">
+        <rect x="455" y="25" width="415" height="75" rx="10"/>
+        <text x="662" y="56" text-anchor="middle">Generation quality</text>
+        <text class="sub" x="662" y="78" text-anchor="middle">coherent, fluent — and above all, factually consistent</text>
+      </g>
+      <g class="node c-violet" data-node="inst" tabindex="0" role="button" aria-label="Instruction following">
+        <rect x="30" y="120" width="415" height="75" rx="10"/>
+        <text x="237" y="151" text-anchor="middle">Instruction following</text>
+        <text class="sub" x="237" y="173" text-anchor="middle">respects your format, constraints, and rules</text>
+      </g>
+      <g class="node c-yellow" data-node="cost" tabindex="0" role="button" aria-label="Cost and latency">
+        <rect x="455" y="120" width="415" height="75" rx="10"/>
+        <text x="662" y="151" text-anchor="middle">Cost &amp; latency</text>
+        <text class="sub" x="662" y="173" text-anchor="middle">fast enough and cheap enough at your scale</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a family</span> to see what's inside.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "domain": {"title": "Domain capability", "body": "The model's raw ability at your kind of task — coding, legal analysis, customer support. Probe it with tasks from your real domain, not generic trivia: strong general benchmarks don't guarantee strength in your niche."},
+      "gen": {"title": "Generation quality", "body": "Fluency and coherence are mostly solved in top models; the criterion that still bites is factual consistency — does the output stay true to the source material and the world? Hallucination detection deserves its own evals."},
+      "inst": {"title": "Instruction following", "body": "Whether the model obeys your constraints: output valid JSON, stay under 100 words, never mention competitors. Critical for automation — a brilliant answer in the wrong format still breaks your pipeline."},
+      "cost": {"title": "Cost & latency", "body": "A model that's 2% better but 10× more expensive or 3× slower is usually the wrong choice. Define budgets up front: max cost per request, max time to first token, throughput at peak."}
+    }
+    </script>
+  </figure>
+
+  <h2>The model selection funnel</h2>
+  <p>Hundreds of models, four filters. Cheap, broad filters first; your own data last.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 330" role="img" aria-label="Funnel narrowing from all models to the chosen one through four stages">
+      <g class="node c-blue" data-node="all" tabindex="0" role="button" aria-label="All available models">
+        <polygon points="120,20 780,20 730,80 170,80"/>
+        <text x="450" y="45" text-anchor="middle">All available models</text>
+        <text class="sub" x="450" y="66" text-anchor="middle">proprietary APIs + open weights</text>
+      </g>
+      <g class="node c-aqua" data-node="filters" tabindex="0" role="button" aria-label="Hard filters">
+        <polygon points="170,90 730,90 680,150 220,150"/>
+        <text x="450" y="115" text-anchor="middle">Hard filters</text>
+        <text class="sub" x="450" y="136" text-anchor="middle">license · privacy · modality · context length</text>
+      </g>
+      <g class="node c-violet" data-node="public" tabindex="0" role="button" aria-label="Public benchmarks">
+        <polygon points="220,160 680,160 630,220 270,220"/>
+        <text x="450" y="185" text-anchor="middle">Public benchmarks</text>
+        <text class="sub" x="450" y="206" text-anchor="middle">shortlist the plausible few</text>
+      </g>
+      <g class="node c-yellow" data-node="own" tabindex="0" role="button" aria-label="Your own evals">
+        <polygon points="270,230 630,230 580,290 320,290"/>
+        <text x="450" y="255" text-anchor="middle">Your own evals</text>
+        <text class="sub" x="450" y="276" text-anchor="middle">your data, your criteria</text>
+      </g>
+      <g class="node c-green" data-node="winner" tabindex="0" role="button" aria-label="Chosen model">
+        <rect x="352" y="300" width="196" height="26" rx="8"/>
+        <text x="450" y="318" text-anchor="middle" style="font-size:13px">Chosen model ✓</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a funnel stage</span> to see how to run it.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "all": {"title": "All available models", "body": "The field is huge and moves monthly: commercial APIs, open-weight models you can host, and finetuned variants. Nobody can deeply evaluate them all — that's what the funnel is for."},
+      "filters": {"title": "Hard filters", "body": "Eliminate on non-negotiables before any quality testing: license terms, data privacy requirements (can data leave your infra?), needed modalities, context window, and whether self-hosting is required. These are yes/no questions — answer them first."},
+      "public": {"title": "Public benchmarks & leaderboards", "body": "Use public results to shortlist — not to decide. Benchmarks are contaminated for some models, saturate at the top, and rarely resemble your actual task. Their job is narrowing to a handful of plausible candidates cheaply."},
+      "own": {"title": "Your own evals", "body": "The step that actually decides: run the shortlisted models on YOUR prompts, data, and criteria, scored with the methods from Chapter 3. This is the evaluation only you can do — and the one worth investing in."},
+      "winner": {"title": "Chosen model — for now", "body": "The decision is never final: models improve, prices drop, your needs shift. Keep the funnel re-runnable so switching costs stay low — that's also your negotiating leverage."}
+    }
+    </script>
+  </figure>
+
+  <h2>Your evaluation pipeline</h2>
+  <p>Evaluation isn't a one-off report — it's a pipeline that runs every time your system changes.</p>
+  <figure class="diagram">
+    <div class="dg-scroll">
+    <svg class="dg" viewBox="0 0 900 220" role="img" aria-label="Four-step evaluation pipeline with a feedback loop">
+      <defs>
+        <marker id="a43" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="arrowhead" d="M0 0L10 5L0 10z"/>
+        </marker>
+      </defs>
+      <g class="node c-blue" data-node="criteria" tabindex="0" role="button" aria-label="Define criteria">
+        <rect x="30" y="50" width="190" height="62" rx="10"/>
+        <text x="125" y="76" text-anchor="middle">Define criteria</text>
+        <text class="sub" x="125" y="96" text-anchor="middle">what does “good” mean?</text>
+      </g>
+      <line class="edge" x1="220" y1="81" x2="256" y2="81" marker-end="url(#a43)"/>
+      <g class="node c-aqua" data-node="testset" tabindex="0" role="button" aria-label="Build the eval set">
+        <rect x="260" y="50" width="190" height="62" rx="10"/>
+        <text x="355" y="76" text-anchor="middle">Build the eval set</text>
+        <text class="sub" x="355" y="96" text-anchor="middle">real cases + edge cases</text>
+      </g>
+      <line class="edge" x1="450" y1="81" x2="486" y2="81" marker-end="url(#a43)"/>
+      <g class="node c-violet" data-node="score" tabindex="0" role="button" aria-label="Score">
+        <rect x="490" y="50" width="190" height="62" rx="10"/>
+        <text x="585" y="76" text-anchor="middle">Score</text>
+        <text class="sub" x="585" y="96" text-anchor="middle">mix methods per criterion</text>
+      </g>
+      <line class="edge" x1="680" y1="81" x2="716" y2="81" marker-end="url(#a43)"/>
+      <g class="node c-green" data-node="track" tabindex="0" role="button" aria-label="Track and iterate">
+        <rect x="720" y="50" width="150" height="62" rx="10"/>
+        <text x="795" y="76" text-anchor="middle">Track</text>
+        <text class="sub" x="795" y="96" text-anchor="middle">catch regressions</text>
+      </g>
+      <path class="edge dashed" d="M795 112 L795 165 L355 165 L355 118" marker-end="url(#a43)"/>
+      <text class="lbl" x="575" y="182" text-anchor="middle">production failures become new eval cases</text>
+    </svg>
+    </div>
+    <figcaption><span class="dg-hint">Click a step</span> for the practical details.</figcaption>
+    <div class="detail-panel" hidden></div>
+    <script type="application/json" class="diagram-data">
+    {
+      "criteria": {"title": "Define criteria", "body": "Turn 'good' into a checklist with the four families from the first diagram — e.g. 'answers correctly (domain), cites only the provided docs (factual consistency), returns valid JSON (instruction), under 3s (latency)'. Vague criteria produce vanity evals."},
+      "testset": {"title": "Build the eval set", "body": "Collect real examples of your task: typical cases, hard cases, and known failure cases. Even 50–200 well-chosen examples beat a generic benchmark of thousands. Keep it versioned, and grow it with every production incident."},
+      "score": {"title": "Score", "body": "Match method to criterion: exact match for verifiable fields, an AI judge with a rubric for open-ended quality, simple assertions for format. Log per-criterion scores, not just one blended number — blends hide regressions."},
+      "track": {"title": "Track & iterate", "body": "Run the pipeline on every meaningful change — new prompt, new model, new retrieval settings — and compare against the last run. Evaluation you run once is a report; evaluation you run every change is a safety net."}
+    }
+    </script>
+  </figure>
+
+  <h2>Key takeaways</h2>
+  <ul class="takeaways">
+    <li><strong>Criteria before models</strong> Decide what "good" means for your product before comparing models — otherwise leaderboards decide for you.</li>
+    <li><strong>Public benchmarks shortlist, your evals decide</strong> Contamination and task mismatch make leaderboards a filter, never a verdict.</li>
+    <li><strong>Small, real eval sets win</strong> 100 examples from your actual users beat 10,000 generic ones. Grow the set from production failures.</li>
+    <li><strong>Evaluate continuously</strong> Every prompt tweak or model swap can regress something. Make evals as routine as running tests.</li>
+  </ul>
+
+  <h2>Check yourself</h2>
+  <section class="quiz">
+    <div class="quiz-body"></div>
+    <script type="application/json" class="quiz-data">
+    [
+      {"q": "Why shouldn't you pick a model purely from public leaderboard rankings?",
+       "opts": ["Leaderboards update too often", "Benchmarks may be contaminated and rarely match your actual task", "Public benchmarks only test open models", "Rankings ignore model size"],
+       "a": 1,
+       "why": "Two problems: contamination (models trained on the test data score inflated results) and mismatch (a general benchmark says little about your niche task). Leaderboards shortlist; your own evals decide."},
+      {"q": "Which of these is a 'hard filter' in model selection?",
+       "opts": ["The model's writing style", "Average benchmark score", "Data privacy requirements that forbid external APIs", "Community popularity"],
+       "a": 2,
+       "why": "Hard filters are non-negotiable yes/no constraints — license, privacy, modality, context length. They eliminate candidates before any quality comparison, saving evaluation effort."},
+      {"q": "What's the best source of examples for your evaluation set?",
+       "opts": ["Randomly generated text", "A popular academic benchmark", "Real cases from your own product, including past failures", "Examples the model writes for itself"],
+       "a": 2,
+       "why": "Your eval set should mirror what your system actually faces. Real user cases — especially ones that previously failed — give the most predictive signal per example."},
+      {"q": "Your team ships a new prompt and quality quietly drops for one use case. What practice catches this?",
+       "opts": ["Running the eval pipeline on every change and comparing per-criterion scores", "Checking the model's parameter count", "Increasing temperature", "Reading the prompt more carefully"],
+       "a": 0,
+       "why": "Regressions are caught by continuous evaluation with per-criterion tracking — a single blended score (or no evals at all) lets localized drops slip through."}
+    ]
+    </script>
+  </section>
+
+  <div class="chapter-actions">
+    <button id="complete-btn" class="complete-btn" type="button">Mark chapter as complete</button>
+  </div>
+
+  <nav class="pager">
+    <a href="ch03.html"><span class="dir">← Previous</span>Evaluation Methodology</a>
+    <a href="ch05.html"><span class="dir">Next chapter →</span>Prompt Engineering</a>
+  </nav>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    An unofficial visual study companion inspired by <em>AI Engineering</em> by Chip Huyen (O'Reilly, 2025).
+  </div>
+</footer>
+
+<script src="../js/app.js"></script>
+<script src="../js/diagram.js"></script>
+<script src="../js/quiz.js"></script>
+</body>
+</html>

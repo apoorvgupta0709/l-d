@@ -28,10 +28,18 @@ python3 -m http.server
 
 Opening `index.html` directly in a browser also works.
 
-## Deploying
+## Deploying to GitHub Pages
 
-The site is fully static with relative paths, so it deploys as-is to GitHub Pages,
-Netlify, Vercel, or any static host.
+The site is fully static with relative paths, so it deploys as-is — no build step,
+no workflow file needed:
+
+1. On GitHub, open **Settings → Pages** for this repository.
+2. Under **Build and deployment**, set Source to **Deploy from a branch**.
+3. Pick branch **`main`**, folder **`/ (root)`**, and click **Save**.
+4. Wait a minute or two, then visit **https://apoorvgupta0709.github.io/l-d/**.
+
+Every future push to `main` redeploys automatically. (Netlify, Vercel, or any other
+static host works too — just point it at the repo root.)
 
 ## Structure
 
